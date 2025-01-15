@@ -23,14 +23,10 @@ void drawAirTagCounter(TFT_eSPI &tft, int airTagCount) {
     int yCenter = 20;
     int radius = 15;
 
-    // Clear the area around the circle
-    tft.fillRect(xCenter - radius, yCenter - radius, 2 * radius, 2 * radius, TFT_BLACK);
-
     // Draw the circle
     tft.fillCircle(xCenter, yCenter, radius, TFT_WHITE); // Circle with white color
 
     // Set the text properties
-    //tft.setTextColor(TFT_BLACK, TFT_YELLOW); // Black text with yellow background
     tft.setTextColor(TFT_RED, TFT_WHITE); // Test with red text and white background
     tft.setTextFont(2); // Set font size
     tft.setTextDatum(MC_DATUM); // Middle Center text alignment
@@ -100,22 +96,43 @@ public:
 
                 // Save the tag info to SD card
                 if (sdInitialized) {
-                    File dataFile = SD.open("/Tag_Info.txt", FILE_WRITE);
 
+                    // If the CSV file doesn't exist, create it and write out the CSV header
+                    if (!SD.exists("/Tag_Info.csv")) {
+
+                        File dataFile = SD.open("/Tag_Info.csv", FILE_WRITE);
+
+                        if (dataFile) {
+
+                            dataFile.println("count,status,mac address,rssi"); // Write header
+                            Serial.println("SD: Tag_Info.csv did not exist, creating and adding header... ");
+                            dataFile.close();
+
+                        } else {
+
+                            Serial.println("SD ERROR: Failed to create CSV file");
+                        }
+                    }
+
+                    // We can always append here because if the file exists, great, if not, we should have created it above
+                    File dataFile = SD.open("/Tag_Info.csv", FILE_APPEND);
                     if (dataFile) {
-                        dataFile.print(tagstatus);
-                        dataFile.print("Tag ");
+
                         dataFile.print(airTagCount);
-                        dataFile.print(": ");
+                        dataFile.print(",");
+                        dataFile.print(tagstatus);
+                        dataFile.print(",");
                         dataFile.print(macAddress);
-                        dataFile.print(", RSSI: ");
+                        dataFile.print(",");
                         dataFile.print(rssi);
-                        dataFile.println(" dBm");
+                        dataFile.print("\n");
                         dataFile.close();
                         Serial.println("Tag info written to SD card.");
+
                     } else {
-                        dataFile.close();
-                        Serial.println("Failed to open or create Tag_Info.txt for writing.");
+
+                        Serial.println("SD ERROR: Failed to open or create Tag_Info.csv for writing.");
+
                     }
                 }
 
@@ -149,7 +166,7 @@ public:
 
 void setup() {
     // Set the version - should read from .env in the future
-    String version = "0.02-Beta";
+    String version = "0.03-Beta";
 
     // Setup the serial port
     Serial.begin(115200);
@@ -218,9 +235,10 @@ void loop() {
     BLEScanResults foundDevicesScan = pBLEScan->start(scanTime, false);
     pBLEScan->clearResults();
     // Update the AirTag counter on the screen - but only if it has changed
-    if (airTagCount != previousAirTagCount) {
-        drawAirTagCounter(tft, airTagCount);
-        previousAirTagCount = airTagCount;
-    }
+    // if (airTagCount != previousAirTagCount) {
+    //     drawAirTagCounter(tft, airTagCount);
+    //     previousAirTagCount = airTagCount;
+    // }
+    drawAirTagCounter(tft, airTagCount);
     delay(50);
 }

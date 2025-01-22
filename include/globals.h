@@ -14,6 +14,15 @@
     #define SDM_SD
 #endif
 
+#include <TFT_eSPI.h>
+#include <BLEScan.h>
+#include <set>
+
+// Define a global constant for the software version
+#define VER "0.03-Beta"
+//extern uint8_t myDefaultFont = 2; // Set default font to Font 2
+
+
 struct keyStroke { // DO NOT CHANGE IT!!!!!
     bool pressed=false;
     bool exit_key=false;

@@ -8,32 +8,25 @@
 #include <set>
 #include <SD.h>
 #include <SPI.h>
+#include <functions.h>
 
+// Calls to libraries:
 TFT_eSPI tft = TFT_eSPI();
-int scanTime = 1;
 BLEScan* pBLEScan;
 std::set<String> foundDevices;
+
+// Other global variables:
+int scanTime = 1;
 static unsigned int airTagCount = 0;
 static unsigned int previousAirTagCount = 0;
-int yPosition = 30; // Starting y position for the first AirTag display
+int yPosition = 50; // Starting y position for the first AirTag display
 String tagstatus = "";
 
-void drawAirTagCounter(TFT_eSPI &tft, int airTagCount) {
-    int xCenter = tft.width() - 20; // Adjust as necessary for your screen size
-    int yCenter = 20;
-    int radius = 15;
-
-    // Draw the circle
-    tft.fillCircle(xCenter, yCenter, radius, TFT_WHITE); // Circle with white color
-
-    // Set the text properties
-    tft.setTextColor(TFT_RED, TFT_WHITE); // Test with red text and white background
-    tft.setTextFont(2); // Set font size
-    tft.setTextDatum(MC_DATUM); // Middle Center text alignment
-
-    // Convert airTagCount to String and draw it inside the circle
-    tft.drawString(String(airTagCount), xCenter, yCenter);
-}
+// Debug
+//Serial.println("tft.width: "+String(tft.width()));
+//Serial.println("xcenter: "+String(xCenter));
+//Serial.println("ycenter: "+String(yCenter));
+//Serial.println("radius: "+String(radius));
 
 class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
 private:
@@ -77,6 +70,9 @@ public:
                 airTagCount++;
 
                 int rssi = advertisedDevice.getRSSI();
+
+                // Convert payload to string using the new function
+                String payloadString = convertPayloadToString(payLoad, payLoadLength);
                 
                 // Print information to Serial Out
                 Serial.print(tagstatus);
@@ -89,9 +85,10 @@ public:
                 Serial.print(rssi);
                 Serial.println(" dBm");
                 Serial.print("Payload Data: ");
-                for (size_t i = 0; i < payLoadLength; i++) {
-                    Serial.printf("%02X ", payLoad[i]);
-                }
+                Serial.println(payloadString);
+//                for (size_t i = 0; i < payLoadLength; i++) {
+//                    Serial.printf("%02X ", payLoad[i]);
+//                }
                 Serial.println("\n");
 
                 // Save the tag info to SD card
@@ -104,7 +101,7 @@ public:
 
                         if (dataFile) {
 
-                            dataFile.println("count,status,mac address,rssi"); // Write header
+                            dataFile.println("count,status,mac_address,rssi,payload"); // Write header
                             Serial.println("SD: Tag_Info.csv did not exist, creating and adding header... ");
                             dataFile.close();
 
@@ -125,7 +122,8 @@ public:
                         dataFile.print(macAddress);
                         dataFile.print(",");
                         dataFile.print(rssi);
-                        dataFile.print("\n");
+                        dataFile.print(",");
+                        dataFile.println(payloadString);
                         dataFile.close();
                         Serial.println("Tag info written to SD card.");
 
@@ -138,7 +136,6 @@ public:
 
                 // Display on the screen
                 // Print Tag number in white
-                tft.setTextFont(1);
                 tft.setTextColor(TFT_WHITE, TFT_BLACK);
                 tft.print(String(tagstatus) + "Tag " + String(airTagCount) + ": ");
 
@@ -152,12 +149,8 @@ public:
 
                 // Print payload data in blue on the next line
                 tft.setTextColor(TFT_BLUE, TFT_BLACK);
-                tft.setTextFont(1);
-                String payload = "";
-                for (size_t i = 0; i < payLoadLength; i++) {
-                    payload += String(payLoad[i], HEX) + " ";
-                }
-                tft.println(payload);
+                tft.println(payloadString);
+//                tft.println(payload);
                 tft.println("");
             }
         }
@@ -165,8 +158,6 @@ public:
 };
 
 void setup() {
-    // Set the version - should read from .env in the future
-    String version = "0.03-Beta";
 
     // Setup the serial port
     Serial.begin(115200);
@@ -178,18 +169,22 @@ void setup() {
     tft.init();
     tft.setRotation(0); // This is the display in landscape
     tft.fillScreen(TFT_BLACK);
-    int fontNum = 2; 
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextSize(1);
 
     // Set starting position for text
     int startX = 1; // 1 pixels from the left
-    int startY = 25; // 25 pixels from the top
+    int startY = 35; // 25 pixels from the top
     tft.setCursor(startX, startY); // Set the cursor position
     
-    tft.println("Airtag Scanner Ver: " + version);
     tft.println("Scanning for BLE Trackers...");
     tft.println("");
     tft.println("");
+
+    //------------------------------------------------------------------------------------------------
+    // Draw the initial text at the top, should display the version and the airtag count as 0
+    //------------------------------------------------------------------------------------------------
+    drawAirTagCounter(tft, airTagCount);
 
     //------------------------------------------------------------------------------------------------
     // Initialize SD card
@@ -234,11 +229,10 @@ void loop() {
 
     BLEScanResults foundDevicesScan = pBLEScan->start(scanTime, false);
     pBLEScan->clearResults();
-    // Update the AirTag counter on the screen - but only if it has changed
-    // if (airTagCount != previousAirTagCount) {
-    //     drawAirTagCounter(tft, airTagCount);
-    //     previousAirTagCount = airTagCount;
-    // }
-    drawAirTagCounter(tft, airTagCount);
+    // Only update the AirTag counter on the screen if it has changed
+    if (airTagCount != previousAirTagCount) {
+        drawAirTagCounter(tft, airTagCount);
+        previousAirTagCount = airTagCount;
+    }
     delay(50);
 }
